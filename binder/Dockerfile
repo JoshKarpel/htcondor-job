@@ -33,7 +33,7 @@ COPY binder/condor_config.local /etc/condor/condor_config.local
 COPY . ${HOME}/htcondor-job
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
  && chown -R ${NB_UID} ${HOME} \
- && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh
+ && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/square.sh
 
 USER ${NB_USER}
 
