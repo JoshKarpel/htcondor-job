@@ -30,8 +30,10 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY binder/condor_config.local /etc/condor/condor_config.local
+COPY binder/.htmaprc ${HOME}/.htmaprc
 COPY . ${HOME}/htcondor-job
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
+ && pip install htmap \
  && chown -R ${NB_UID} ${HOME} \
  && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/square.sh
 

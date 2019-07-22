@@ -21,23 +21,22 @@ import threading
 from copy import copy
 import weakref
 
+import cloudpickle
+
 import htcondor
 
-LOG_DIR = Path.home() / ".job_logs"
-LOG_DIR.mkdir(parents = True, exist_ok = True)
-
-JOBS = weakref.WeakSet()
+TASKS = weakref.WeakSet()
 
 
 def read_events():
     while True:
         time.sleep(.1)
 
-        for job in copy(JOBS):
-            for event in job._events:
-                maybe_new_state = JOB_STATE_TRANSITIONS.get(event.type, None)
+        for task in copy(TASKS):
+            for event in task._events:
+                maybe_new_state = TASK_STATE_TRANSITIONS.get(event.type, None)
                 if maybe_new_state is not None:
-                    job._state = maybe_new_state
+                    task._state = maybe_new_state
 
 
 EVENT_THREAD = threading.Thread(
@@ -47,7 +46,7 @@ EVENT_THREAD = threading.Thread(
 EVENT_THREAD.start()
 
 
-class JobState(enum.Enum):
+class TaskState(enum.Enum):
     Unsubmitted = enum.auto()
     Idle = enum.auto()
     Running = enum.auto()
@@ -60,71 +59,68 @@ class JobState(enum.Enum):
         return f"<{self.__class__.__name__}.{self.name}>"
 
 
-JOB_STATE_TRANSITIONS = {
-    htcondor.JobEventType.SUBMIT: JobState.Idle,
-    htcondor.JobEventType.JOB_EVICTED: JobState.Idle,
-    htcondor.JobEventType.JOB_UNSUSPENDED: JobState.Idle,
-    htcondor.JobEventType.JOB_RELEASED: JobState.Idle,
-    htcondor.JobEventType.SHADOW_EXCEPTION: JobState.Idle,
-    htcondor.JobEventType.JOB_RECONNECT_FAILED: JobState.Idle,
-    htcondor.JobEventType.JOB_TERMINATED: JobState.Completed,
-    htcondor.JobEventType.EXECUTE: JobState.Running,
-    htcondor.JobEventType.JOB_HELD: JobState.Held,
-    htcondor.JobEventType.JOB_ABORTED: JobState.Removed,
+TASK_STATE_TRANSITIONS = {
+    htcondor.JobEventType.SUBMIT: TaskState.Idle,
+    htcondor.JobEventType.JOB_EVICTED: TaskState.Idle,
+    htcondor.JobEventType.JOB_UNSUSPENDED: TaskState.Idle,
+    htcondor.JobEventType.JOB_RELEASED: TaskState.Idle,
+    htcondor.JobEventType.SHADOW_EXCEPTION: TaskState.Idle,
+    htcondor.JobEventType.JOB_RECONNECT_FAILED: TaskState.Idle,
+    htcondor.JobEventType.JOB_TERMINATED: TaskState.Completed,
+    htcondor.JobEventType.EXECUTE: TaskState.Running,
+    htcondor.JobEventType.JOB_HELD: TaskState.Held,
+    htcondor.JobEventType.JOB_ABORTED: TaskState.Removed,
 }
 
 
-class Job:
+class Task:
     def __init__(
         self,
-        executable,
-        arguments = None,
-        input_files = None,
-        output_files = None,
+        function,
+        input_file,
+        working_dir = None
     ):
+        self.function = function
+        self.input_file = input_file
+
+        if working_dir is None:
+            working_dir = Path.cwd()
+
         self.uid = uuid.uuid4()
 
-        self._executable = executable
-        self._arguments = arguments or []
-        self._input_files = input_files or []
-        self._output_files = output_files or []
-        self._event_log_path = LOG_DIR / str(self.uid)
+        self.working_dir = working_dir
+        self.working_dir.mkdir(parents = True, exist_ok = True)
+        self._event_log_path = self.working_dir / f'{self.uid}.log'
         self._event_log_path.touch(exist_ok = True)
         self._events = htcondor.JobEventLog(self._event_log_path.as_posix()).events(0)
 
-        self._state = JobState.Unsubmitted
+        self._state = TaskState.Unsubmitted
         self._jobid = None
 
-        JOBS.add(self)
-
-    def __str__(self):
-        lines = [repr(self)]
-
-        lines.extend(f"  {line}" for line in (
-            f"executable = {self._executable}",
-            f"arguments = {self._arguments}",
-            f"input files = {self._input_files}",
-            f"output files = {self._output_files}"
-        ))
-
-        return '\n'.join(lines)
+        TASKS.add(self)
 
     def __repr__(self):
-        return f"Job {self.uid} [{self.state}]"
+        return f"Task {self.uid} [{self.state}]"
 
     def __del__(self):
-        JOBS.remove(self)
+        TASKS.remove(self)
 
     @property
     def state(self):
         return self._state
 
     def submit(self):
+        func_path = self.working_dir / f'{self.uid}.func'
+        with func_path.open(mode = 'wb') as f:
+            cloudpickle.dump(self.function, f)
+
         sub = htcondor.Submit(dict(
-            executable = self._executable,
-            arguments = " ".join(self._arguments),
-            transfer_input_files = ", ".join(self._input_files),
-            transfer_output_files = ", ".join(self._output_files),
+            executable = str(Path(__file__).parent / 'run.py'),
+            arguments = f'{self.uid} {self.input_file}',
+            transfer_input_files = f'{self.input_file}, {func_path}',
+            transfer_output_files = f'{self.uid}.output',
+            output = str(self.working_dir / f'{self.uid}.out'),
+            error = str(self.working_dir / f'{self.uid}.err'),
             log = self._event_log_path.as_posix(),
         ))
 
@@ -141,53 +137,22 @@ class Job:
         cluster, proc = self._jobid
         return f"(ClusterID == {cluster} && ProcID == {proc})"
 
-    def hold(self):
+    def _act(self, action):
         schedd = htcondor.Schedd()
-        schedd.act(htcondor.JobAction.Hold, self._constraint)
+        schedd.act(action, self._constraint)
         return self
-
-    def release(self):
-        schedd = htcondor.Schedd()
-        schedd.act(htcondor.JobAction.Release, self._constraint)
-        return self
-
-    def remove(self):
-        schedd = htcondor.Schedd()
-        schedd.act(htcondor.JobAction.Remove, self._constraint)
-        return self
-
-    @property
-    def output_files(self):
-        yield from (Path(x) for x in self._output_files)
-
-
-class Jobs:
-    def __init__(self, jobs):
-        self.jobs = list(jobs)
-
-    def __iter__(self):
-        yield from self.jobs
-
-    @property
-    def state(self):
-        return [job.state for job in self]
-
-    def submit(self):
-        for job in self:
-            job.submit()
 
     def hold(self):
-        for job in self:
-            job.hold()
+        return self._act(htcondor.JobAction.Hold)
 
     def release(self):
-        for job in self:
-            job.release()
+        return self._act(htcondor.JobAction.Release)
 
     def remove(self):
-        for job in self:
-            job.remove()
+        return self._act(htcondor.JobAction.Remove)
 
     @property
-    def output_files(self):
-        yield from (job.output_files for job in self)
+    def output_file(self):
+        if self.state is not TaskState.Completed:
+            raise Exception('Task is not complete yet!')
+        return self.working_dir / f'{self.uid}.output'
