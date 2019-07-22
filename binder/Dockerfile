@@ -35,7 +35,7 @@ COPY . ${HOME}/htcondor-job
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
  && pip install --no-cache-dir htmap nbstripout \
  && chown -R ${NB_UID} ${HOME} \
- && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/square.sh
+ && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/square.sh ${HOME}/htcondor-job/htcondor_job/run.py
 
 RUN nbstripout /home/${NB_USER}/htcondor-job/*.ipynb
 
