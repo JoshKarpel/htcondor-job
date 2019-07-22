@@ -33,9 +33,11 @@ COPY binder/condor_config.local /etc/condor/condor_config.local
 COPY binder/.htmaprc ${HOME}/.htmaprc
 COPY . ${HOME}/htcondor-job
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
- && pip install htmap \
+ && pip install --no-cache-dir htmap nbstripout \
  && chown -R ${NB_UID} ${HOME} \
  && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/square.sh
+
+RUN nbstripout /home/${NB_USER}/htcondor-job/*.ipynb
 
 USER ${NB_USER}
 

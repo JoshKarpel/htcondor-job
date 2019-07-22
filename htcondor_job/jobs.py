@@ -81,7 +81,7 @@ class Task:
         working_dir = None
     ):
         self.function = function
-        self.input_file = input_file
+        self.input_file = Path(input_file)
 
         if working_dir is None:
             working_dir = Path.cwd()
@@ -94,13 +94,15 @@ class Task:
         self._event_log_path.touch(exist_ok = True)
         self._events = htcondor.JobEventLog(self._event_log_path.as_posix()).events(0)
 
+        self._output_file_path = self.working_dir / f'{self.uid}.output'
+
         self._state = TaskState.Unsubmitted
         self._jobid = None
 
         TASKS.add(self)
 
     def __repr__(self):
-        return f"Task {self.uid} [{self.state}]"
+        return f"Task {self.uid} [{self.state}] {self.function.__name__}({self.input_file})"
 
     def __del__(self):
         TASKS.remove(self)
@@ -155,4 +157,4 @@ class Task:
     def output_file(self):
         if self.state is not TaskState.Completed:
             raise Exception('Task is not complete yet!')
-        return self.working_dir / f'{self.uid}.output'
+        return self._output_file_path
