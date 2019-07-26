@@ -102,7 +102,7 @@ class Task:
         TASKS.add(self)
 
     def __repr__(self):
-        return f"Task {self.uid} [{self.state}] {self.function.__name__}({self.input_file})"
+        return f"Task [{self.state}] {self.function.__name__}({self.input_file})"
 
     def __del__(self):
         TASKS.remove(self)
