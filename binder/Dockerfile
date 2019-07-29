@@ -29,9 +29,13 @@ RUN apt-get update \
  && apt-get -y clean \
  && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /usr/local/bin/before-notebook.d
+
+COPY binder/start-htcondor.sh /usr/local/bin/before-notebook.d/
 COPY binder/condor_config.local /etc/condor/condor_config.local
 COPY binder/.htmaprc ${HOME}/.htmaprc
 COPY . ${HOME}/htcondor-job
+
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
  && pip install --no-cache-dir htmap nbstripout \
  && chown -R ${NB_UID} ${HOME} \
@@ -42,5 +46,3 @@ RUN nbstripout /home/${NB_USER}/htcondor-job/*.ipynb
 USER ${NB_USER}
 
 WORKDIR /home/jovyan/htcondor-job
-ENTRYPOINT ["binder/entrypoint.sh"]
-CMD ["jupyter", "lab"]
