@@ -31,7 +31,7 @@ RUN apt-get update \
 
 RUN mkdir -p /usr/local/bin/before-notebook.d
 
-COPY binder/start-htcondor.sh /usr/local/bin/before-notebook.d/
+COPY binder/start-condor.sh /usr/local/bin/before-notebook.d/
 COPY binder/condor_config.local /etc/condor/condor_config.local
 COPY binder/.htmaprc ${HOME}/.htmaprc
 COPY . ${HOME}/htcondor-job
