@@ -18,21 +18,19 @@ import uuid
 import time
 from pathlib import Path
 import threading
-from copy import copy
-import weakref
 
 import cloudpickle
 
 import htcondor
 
-TASKS = weakref.WeakSet()
+TASKS = set()
 
 
 def read_events():
     while True:
         time.sleep(.1)
 
-        for task in copy(TASKS):
+        for task in TASKS:
             for event in task._events:
                 maybe_new_state = TASK_STATE_TRANSITIONS.get(event.type, None)
                 if maybe_new_state is not None:

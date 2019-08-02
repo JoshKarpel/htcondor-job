@@ -37,7 +37,7 @@ COPY binder/.htmaprc ${HOME}/.htmaprc
 COPY . ${HOME}/htcondor-job
 
 RUN pip install --no-cache-dir -e ${HOME}/htcondor-job \
- && pip install --no-cache-dir htmap nbstripout \
+ && pip install --no-cache-dir nbstripout \
  && chown -R ${NB_UID} ${HOME} \
  && chmod +x ${HOME}/htcondor-job/binder/entrypoint.sh ${HOME}/htcondor-job/htcondor_job/run.py
 
