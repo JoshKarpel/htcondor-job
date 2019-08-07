@@ -33,9 +33,9 @@ RUN mkdir -p /usr/local/bin/before-notebook.d
 
 COPY playground/start-condor.sh /usr/local/bin/before-notebook.d/
 COPY playground/condor_config.local /etc/condor/condor_config.local
-COPY . /tmp/htcondor-job
 
-RUN pip install --no-cache-dir /tmp/htcondor-job \
- && chown -R ${NB_UID} ${HOME}
+COPY . /opt/htcondor-job
+RUN chmod +x /opt/htcondor-job/htcondor_job/run.py \
+ && pip install --no-cache-dir -e /opt/htcondor-job
 
 USER ${NB_USER}

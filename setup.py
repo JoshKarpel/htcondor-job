@@ -21,14 +21,13 @@ from setuptools import setup
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 
-
 setup(
-    name="htcondor-job",
-    version="0.0.01",
-    author="Josh Karpel",
-    author_email="josh.karpel@gmail.com",
-    long_description=Path("README.md").read_text(),
-    long_description_content_type="text/markdown",
-    packages=["htcondor_job"],
-    install_requires=Path("requirements.txt").read_text().splitlines(),
+    name = "htcondor-job",
+    version = "0.0.1",
+    author = "Josh Karpel",
+    author_email = "josh.karpel@gmail.com",
+    long_description = Path("README.md").read_text(),
+    long_description_content_type = "text/markdown",
+    packages = ["htcondor_job"],
+    install_requires = Path("requirements.txt").read_text().splitlines(),
 )
